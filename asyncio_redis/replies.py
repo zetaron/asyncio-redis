@@ -3,6 +3,7 @@ from asyncio.tasks import gather
 
 __all__ = (
     'BlockingPopReply',
+    'BlockingZPopReply',
     'DictReply',
     'ListReply',
     'PubSubReply',
@@ -171,6 +172,36 @@ class BlockingPopReply:
 
     def __repr__(self):
         return 'BlockingPopReply(list_name=%r, value=%r)' % (self.list_name, self.value)
+
+
+class BlockingZPopReply:
+    """
+    :func:`~asyncio_redis.RedisProtocol.bzpopmin` or
+    :func:`~asyncio_redis.RedisProtocol.bzpopmax` reply
+    """
+    def __init__(self, list_name, value, score):
+        self._list_name = list_name
+        self._value = value
+        self._score = score
+
+    @property
+    def list_name(self):
+        """ List name. """
+        return self._list_name
+
+    @property
+    def value(self):
+        """ Popped value """
+        return self._value
+
+    @property
+    def score(self):
+        """ Score of value """
+        return self._score
+
+
+    def __repr__(self):
+        return 'BlockingZPopReply(list_name=%r, value=%r, score=%r)' % (self.list_name, self.value, self.score)
 
 
 class ConfigPairReply:

@@ -40,6 +40,7 @@ from .replies import (
         SetReply,
         StatusReply,
         ZRangeReply,
+        BlockingZPopReply,
 )
 
 
@@ -258,6 +259,7 @@ class PostProcessors:
                 str: cls.bytes_to_str,
                 bool: cls.int_to_bool,
                 BlockingPopReply: cls.multibulk_as_blocking_pop_reply,
+                BlockingZPopReply: cls.multibulk_as_blocking_zpop_reply,
                 ZRangeReply: cls.multibulk_as_zrangereply,
 
                 StatusReply: cls.bytes_to_status_reply,
@@ -336,6 +338,15 @@ class PostProcessors:
             assert isinstance(result, MultiBulkReply)
             list_name, value = yield from ListReply(result).aslist()
             return BlockingPopReply(list_name, value)
+
+    @asyncio.coroutine
+    def multibulk_as_blocking_zpop_reply(protocol, result):
+        if result is None:
+            raise TimeoutError('Timeout in blocking pop')
+        else:
+            assert isinstance(result, MultiBulkReply)
+            list_name, value, score = yield from ListReply(result).aslist()
+            return BlockingZPopReply(list_name, value, score)
 
     @asyncio.coroutine
     def multibulk_as_configpair(protocol, result):
@@ -555,6 +566,7 @@ class CommandCreator:
             try:
                 return {
                     BlockingPopReply: ":class:`BlockingPopReply <asyncio_redis.replies.BlockingPopReply>`",
+                    BlockingZPopReply: ":class:`BlockingZPopReply <asyncio_redis.replies.BlockingZPopReply>`",
                     ConfigPairReply: ":class:`ConfigPairReply <asyncio_redis.replies.ConfigPairReply>`",
                     DictReply: ":class:`DictReply <asyncio_redis.replies.DictReply>`",
                     InfoReply: ":class:`InfoReply <asyncio_redis.replies.InfoReply>`",
@@ -1655,6 +1667,24 @@ class RedisProtocol(asyncio.Protocol, metaclass=_RedisProtocolMeta):
                     self._encode_zscore_boundary(min), self._encode_zscore_boundary(max),
                     b'limit', self._encode_int(offset), self._encode_int(limit),
                     b'withscores')
+
+    @_query_command
+    def bzpopmin(self, tr, keys:ListOf(NativeType), timeout:int=0) -> BlockingZPopReply:
+        """
+        Return the first element from sorted set with a minimum score, or block until one is available.
+
+        This will raise :class:`~asyncio_redis.exceptions.TimeoutError` when
+        the timeout was exceeded and Redis returns `None`. """
+        return self._blocking_pop(tr, b'bzpopmin', keys, timeout=timeout)
+
+    @_query_command
+    def bzpopmax(self, tr, keys:ListOf(NativeType), timeout:int=0) -> BlockingZPopReply:
+        """
+        Return the first element from sorted set with a maximum score, or block until one is available.
+
+        This will raise :class:`~asyncio_redis.exceptions.TimeoutError` when
+        the timeout was exceeded and Redis returns `None`. """
+        return self._blocking_pop(tr, b'bzpopmax', keys, timeout=timeout)
 
     @_query_command
     def zrevrangebyscore(self, tr, key:NativeType,
