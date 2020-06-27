@@ -1,2 +1,7 @@
 *.py[cod]
 __pycache__
+*.egg-info/
+dist
+build
+pip-wheel-metadata/
+!.vscode
